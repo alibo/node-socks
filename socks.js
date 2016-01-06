@@ -86,7 +86,7 @@ function createSocksServer(cb) {
         console.log('LISTENING %s:%d', address.address, address.port);
     });
     socksServer.on('connection', function(socket) {
-        info('CONNECTED %s:%d', socket.remoteAddress, socket.remotePort);
+        // info('CONNECTED %s:%d', socket.remoteAddress, socket.remotePort);
         initSocksConnection.bind(socket)(cb);
     });
     return socksServer;
@@ -199,6 +199,7 @@ function handshake4(chunk) {
         }
         if (chunk[8+it] == 0x00) {
             // DNS lookup
+            
             DNS.lookup(address, function(err, ip, family){
 	            if (err) {
 	                errorLog(err+',socks4a dns lookup failed');
@@ -210,7 +211,7 @@ function handshake4(chunk) {
 				    this.socksPort = port;
 				    this.socksUid = uid;
 				    
-				    log('socks4a Request: type: %d -- to: %s:%d:%s', cmd, address, port, uid);
+				    console.log('socks4a Request: type: %d -- to: %s:%d:%s', cmd, address, port, uid);
 				
 				    if (cmd == REQUEST_CMD.CONNECT) {
 				        this.request = chunk;

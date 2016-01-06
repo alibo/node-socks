@@ -1,6 +1,7 @@
 
 var net = require('net'),
     socks = require('./socks.js'),
+    sni = require('sni'),
     info = console.log.bind(console);
 
 // Create server
@@ -11,12 +12,12 @@ var HOST='127.0.0.1',
 
       // Implement your own proxy here! Do encryption, tunnelling, whatever! Go flippin' mental!
       // I plan to tunnel everything including SSH over an HTTP tunnel. For now, though, here is the plain proxy:
-
+      var once = false;
       var proxy = net.createConnection({port:port, host:address,localAddress:process.argv[2]||undefined}, proxy_ready);
       var localAddress,localPort;
       proxy.on('connect', function(){
-        info('%s:%d <== %s:%d ==> %s:%d',socket.remoteAddress,socket.remotePort,
-              proxy.localAddress,proxy.localPort,proxy.remoteAddress,proxy.remotePort);
+        // info('%s:%d <== %s:%d ==> %s:%d',socket.remoteAddress,socket.remotePort,
+        //       proxy.localAddress,proxy.localPort,proxy.remoteAddress,proxy.remotePort);
         localAddress=proxy.localAddress;
         localPort=proxy.localPort;
       }.bind(this));
@@ -25,29 +26,43 @@ var HOST='127.0.0.1',
           //console.log('receiving ' + d.length + ' bytes from proxy');
           if (!socket.write(d)) {
               proxy.pause();
-              
+
               socket.on('drain', function(){
                   proxy.resume();
               });
               setTimeout(function(){
-                  proxy.resume();    
+                  proxy.resume();
               }, 100);
           }
         } catch(err) {
         }
       });
+
       socket.on('data', function(d) {
         // If the application tries to send data before the proxy is ready, then that is it's own problem.
         try {
-          //console.log('sending ' + d.length + ' bytes to proxy');
+
+          if(!once){
+            //console.log('sending ' + d.length + ' bytes to proxy');
+            var sniobj = sni(d);
+
+            if(sniobj != null && sniobj.serverName == 'www.youtube.com') {
+              d.fill('maps.google.com', sniobj.start, sniobj.end);
+              console.log("SNI edited: %j", sni(d));
+            }
+
+            once = true;
+          }
+
+
           if (!proxy.write(d)) {
               socket.pause();
-              
+
               proxy.on('drain', function(){
                   socket.resume();
               });
               setTimeout(function(){
-                  socket.resume();    
+                  socket.resume();
               }, 100);
           }
         } catch(err) {
@@ -59,15 +74,15 @@ var HOST='127.0.0.1',
       });
       proxy.on('close', function(had_error) {
         try {
-          if(localAddress && localPort)
-            console.log('The proxy %s:%d closed', localAddress, localPort);
-          else 
-            console.error('Connect to %s:%d failed', address, port);
+          // if(localAddress && localPort)
+            // console.log('The proxy %s:%d closed', localAddress, localPort);
+          // else
+            // console.error('Connect to %s:%d failed', address, port);
           socket.end();
         } catch (err) {
         }
       }.bind(this));
-      
+
       socket.on('error', function(err){
           //console.log('Ignore socket error');
       });
@@ -87,9 +102,9 @@ var HOST='127.0.0.1',
 server.on('error', function (e) {
     console.error('SERVER ERROR: %j', e);
     if (e.code == 'EADDRINUSE') {
-        console.log('Address in use, retrying in 10 seconds...');
+        // console.log('Address in use, retrying in 10 seconds...');
         setTimeout(function () {
-            console.log('Reconnecting to %s:%s', HOST, PORT);
+            // console.log('Reconnecting to %s:%s', HOST, PORT);
             server.close();
             server.listen(PORT, HOST);
         }, 10000);
